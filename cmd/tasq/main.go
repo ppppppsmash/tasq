@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/kurosawa-dev/tasq/internal/handler"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/socketmode"
 )
@@ -33,23 +34,30 @@ func run() error {
 		socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.LstdFlags)),
 	)
 
-	go handleEvents(client)
+	cmdHandler := handler.NewCommandHandler(client)
+
+	go handleEvents(client, cmdHandler)
 
 	log.Println("tasq starting...")
 	return client.Run()
 }
 
-func handleEvents(client *socketmode.Client) {
+func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler) {
 	for evt := range client.Events {
 		switch evt.Type {
+		case socketmode.EventTypeSlashCommand:
+			cmd, ok := evt.Data.(slack.SlashCommand)
+			if !ok {
+				continue
+			}
+			go cmdHandler.Handle(evt, cmd)
+
 		case socketmode.EventTypeConnecting:
 			log.Println("connecting to Slack...")
 		case socketmode.EventTypeConnected:
 			log.Println("connected to Slack")
 		case socketmode.EventTypeConnectionError:
 			log.Println("connection error")
-		default:
-			log.Printf("event: %s\n", evt.Type)
 		}
 	}
 }
