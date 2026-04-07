@@ -25,7 +25,7 @@ func resolveTargetMessage(cmd slack.SlashCommand, args string) (string, error) {
 		// For now, we rely on the message link approach or future event-based detection.
 	}
 
-	return "", fmt.Errorf("specify a message link: `/tasq check <message URL>`")
+	return "", fmt.Errorf("specify a message link: `/checky check <message URL>`")
 }
 
 func extractMessageLink(text string) string {

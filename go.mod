@@ -1,4 +1,4 @@
-module github.com/kurosawa-dev/tasq
+module github.com/kurosawa-dev/checky
 
 go 1.26.1
 

@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/kurosawa-dev/tasq/internal/mention"
+	"github.com/kurosawa-dev/checky/internal/mention"
 	"github.com/slack-go/slack"
 )
 
