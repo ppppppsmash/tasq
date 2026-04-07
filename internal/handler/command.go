@@ -40,7 +40,7 @@ func (h *CommandHandler) handleCheck(cmd slack.SlashCommand) {
 	}
 
 	log.Printf("check: channel=%s ts=%s args=%q", cmd.ChannelID, targetTS, args)
-	h.respond(cmd.ChannelID, fmt.Sprintf("checking message `%s` ...", targetTS))
+	h.runCheck(cmd.ChannelID, targetTS, nil)
 }
 
 func (h *CommandHandler) respond(channel, text string) {
