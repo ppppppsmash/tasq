@@ -7,6 +7,7 @@ import (
 
 	"github.com/kurosawa-dev/tasq/internal/handler"
 	"github.com/slack-go/slack"
+	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
 )
 
@@ -35,14 +36,15 @@ func run() error {
 	)
 
 	cmdHandler := handler.NewCommandHandler(client)
+	reactionHandler := handler.NewReactionHandler(client, cmdHandler)
 
-	go handleEvents(client, cmdHandler)
+	go handleEvents(client, cmdHandler, reactionHandler)
 
 	log.Println("tasq starting...")
 	return client.Run()
 }
 
-func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler) {
+func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler, reactionHandler *handler.ReactionHandler) {
 	for evt := range client.Events {
 		switch evt.Type {
 		case socketmode.EventTypeSlashCommand:
@@ -51,6 +53,17 @@ func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler)
 				continue
 			}
 			go cmdHandler.Handle(evt, cmd)
+
+		case socketmode.EventTypeEventsAPI:
+			eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
+			if !ok {
+				continue
+			}
+			client.Ack(*evt.Request)
+
+			if inner, ok := handler.ExtractReactionEvent(eventsAPIEvent); ok {
+				go reactionHandler.Handle(evt, inner)
+			}
 
 		case socketmode.EventTypeConnecting:
 			log.Println("connecting to Slack...")
