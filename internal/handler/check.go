@@ -159,23 +159,23 @@ func formatResult(r CheckResult) string {
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "📋 確認・対応が済んだら、✅リアクションをつけてください\n")
-	fmt.Fprintf(&b, "━━━━━━━━━━━━━━━\n\n")
-	fmt.Fprintf(&b, "対象: %d名\n\n", total)
+	fmt.Fprintf(&b, "\n\n")
+	fmt.Fprintf(&b, "対象: %d名\n", total)
 
 	if doneCount > 0 {
-		fmt.Fprintf(&b, "✅ 完了（%d名）\n", doneCount)
-		fmt.Fprintf(&b, "%s\n\n", formatUserList(r.DoneUsers))
+		fmt.Fprintf(&b, "✅ 完了（%d名）", doneCount)
+		fmt.Fprintf(&b, "%s\n", formatUserList(r.DoneUsers))
 	}
 	if len(r.UndoneUsers) > 0 {
-		fmt.Fprintf(&b, "❌ 未完了（%d名）\n", len(r.UndoneUsers))
-		fmt.Fprintf(&b, "%s\n\n", formatUserList(r.UndoneUsers))
+		fmt.Fprintf(&b, "❌ 未完了（%d名）", len(r.UndoneUsers))
+		fmt.Fprintf(&b, "%s\n", formatUserList(r.UndoneUsers))
 	}
 
 	pct := 0
 	if total > 0 {
 		pct = doneCount * 100 / total
 	}
-	fmt.Fprintf(&b, "━━━━━━━━━━━━━━━\n")
+	fmt.Fprintf(&b, "\n")
 	fmt.Fprintf(&b, "進捗: %d/%d（%d%%）", doneCount, total, pct)
 
 	return b.String()
