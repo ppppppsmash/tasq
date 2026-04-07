@@ -5,6 +5,7 @@ import (
 	"log"
 	"strings"
 
+	"github.com/kurosawa-dev/tasq/internal/mention"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/socketmode"
 )
@@ -39,8 +40,38 @@ func (h *CommandHandler) handleCheck(cmd slack.SlashCommand) {
 		return
 	}
 
-	log.Printf("check: channel=%s ts=%s args=%q", cmd.ChannelID, targetTS, args)
-	h.runCheck(cmd.ChannelID, targetTS, nil)
+	// Expand usergroup mentions in args
+	groupMembers, err := h.expandUserGroups(args)
+	if err != nil {
+		h.respond(cmd.ChannelID, fmt.Sprintf("error expanding usergroups: %v", err))
+		return
+	}
+
+	log.Printf("check: channel=%s ts=%s args=%q groups=%d members", cmd.ChannelID, targetTS, args, len(groupMembers))
+	h.runCheck(cmd.ChannelID, targetTS, groupMembers)
+}
+
+func (h *CommandHandler) expandUserGroups(text string) ([]string, error) {
+	groupIDs := mention.ParseUserGroups(text)
+	if len(groupIDs) == 0 {
+		return nil, nil
+	}
+
+	seen := make(map[string]bool)
+	var members []string
+	for _, gid := range groupIDs {
+		users, err := h.client.GetUserGroupMembers(gid)
+		if err != nil {
+			return nil, fmt.Errorf("get members of %s: %w", gid, err)
+		}
+		for _, uid := range users {
+			if !seen[uid] {
+				seen[uid] = true
+				members = append(members, uid)
+			}
+		}
+	}
+	return members, nil
 }
 
 func (h *CommandHandler) respond(channel, text string) {
