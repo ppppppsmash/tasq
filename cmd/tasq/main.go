@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	"github.com/kurosawa-dev/tasq/internal/handler"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
@@ -19,6 +20,8 @@ func main() {
 }
 
 func run() error {
+	_ = godotenv.Load()
+
 	appToken := os.Getenv("SLACK_APP_TOKEN")
 	botToken := os.Getenv("SLACK_BOT_TOKEN")
 
