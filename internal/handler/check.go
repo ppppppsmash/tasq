@@ -164,7 +164,7 @@ func formatResult(r CheckResult) string {
 	summary = strings.ReplaceAll(summary, "\n", " ")
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "📋 集計: %s\n", summary)
+	fmt.Fprintf(&b, "リアクションをつけてくださいね。: %s\n", summary)
 	fmt.Fprintf(&b, "対象: %d名\n", total)
 
 	if doneCount > 0 {
