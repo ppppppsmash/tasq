@@ -5,7 +5,7 @@ import (
 	"log"
 	"strings"
 
-	"github.com/kurosawa-dev/checky/internal/mention"
+	"github.com/kurosawa-dev/rollcall/internal/mention"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/socketmode"
 )
@@ -27,7 +27,7 @@ func (h *CommandHandler) Handle(evt socketmode.Event, cmd slack.SlashCommand) {
 	case subcommand == "check" || strings.HasPrefix(subcommand, "check "):
 		h.handleCheck(cmd)
 	default:
-		h.respond(cmd.ChannelID, fmt.Sprintf("unknown subcommand: `%s`\nusage: `/checky check`", subcommand))
+		h.respond(cmd.ChannelID, fmt.Sprintf("unknown subcommand: `%s`\nusage: `/rollcall check`", subcommand))
 	}
 }
 

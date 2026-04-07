@@ -6,7 +6,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
-	"github.com/kurosawa-dev/checky/internal/handler"
+	"github.com/kurosawa-dev/rollcall/internal/handler"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
@@ -43,7 +43,7 @@ func run() error {
 
 	go handleEvents(client, cmdHandler, reactionHandler)
 
-	log.Println("checky starting...")
+	log.Println("rollcall starting...")
 	return client.Run()
 }
 

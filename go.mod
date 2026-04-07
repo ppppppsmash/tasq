@@ -1,4 +1,4 @@
-module github.com/kurosawa-dev/checky
+module github.com/kurosawa-dev/rollcall
 
 go 1.26.1
 
