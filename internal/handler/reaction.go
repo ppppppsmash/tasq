@@ -5,21 +5,20 @@ import (
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
-	"github.com/slack-go/slack/socketmode"
 )
 
 const TriggerReaction = "clipboard"
 
 type ReactionHandler struct {
-	client     *socketmode.Client
+	client     *slack.Client
 	cmdHandler *CommandHandler
 }
 
-func NewReactionHandler(client *socketmode.Client, cmdHandler *CommandHandler) *ReactionHandler {
+func NewReactionHandler(client *slack.Client, cmdHandler *CommandHandler) *ReactionHandler {
 	return &ReactionHandler{client: client, cmdHandler: cmdHandler}
 }
 
-func (h *ReactionHandler) Handle(evt socketmode.Event, innerEvent *slackevents.ReactionAddedEvent) {
+func (h *ReactionHandler) Handle(innerEvent *slackevents.ReactionAddedEvent) {
 	if innerEvent.Reaction != TriggerReaction {
 		return
 	}

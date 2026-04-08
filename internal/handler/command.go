@@ -7,20 +7,17 @@ import (
 
 	"github.com/kurosawa-dev/rollcall/internal/mention"
 	"github.com/slack-go/slack"
-	"github.com/slack-go/slack/socketmode"
 )
 
 type CommandHandler struct {
-	client *socketmode.Client
+	client *slack.Client
 }
 
-func NewCommandHandler(client *socketmode.Client) *CommandHandler {
+func NewCommandHandler(client *slack.Client) *CommandHandler {
 	return &CommandHandler{client: client}
 }
 
-func (h *CommandHandler) Handle(evt socketmode.Event, cmd slack.SlashCommand) {
-	h.client.Ack(*evt.Request)
-
+func (h *CommandHandler) Handle(cmd slack.SlashCommand) {
 	subcommand := strings.TrimSpace(cmd.Text)
 
 	switch {
