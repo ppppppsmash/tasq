@@ -158,7 +158,7 @@ func formatResult(r CheckResult) string {
 	doneCount := len(r.DoneUsers)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "📋 確認・対応が済んだら、✅リアクションをつけてください\n")
+	fmt.Fprintf(&b, "確認・対応が済んだら、✅リアクションをつけてください\n")
 	fmt.Fprintf(&b, "\n\n")
 	fmt.Fprintf(&b, "対象: %d名\n", total)
 
@@ -177,6 +177,10 @@ func formatResult(r CheckResult) string {
 	}
 	fmt.Fprintf(&b, "\n")
 	fmt.Fprintf(&b, "進捗: %d/%d（%d%%）", doneCount, total, pct)
+
+	if total > 0 && doneCount == total {
+		fmt.Fprintf(&b, "\n\n🎉全員完了しました！ありがとうございました！")
+	}
 
 	return b.String()
 }
