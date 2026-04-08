@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
@@ -52,20 +53,33 @@ func runLambda(api *slack.Client) error {
 }
 
 func (h *lambdaHandler) handleRequest(_ context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+	body := req.Body
+	if req.IsBase64Encoded {
+		decoded, err := base64.StdEncoding.DecodeString(body)
+		if err != nil {
+			log.Printf("failed to decode base64 body: %v", err)
+			return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "bad request"}, nil
+		}
+		body = string(decoded)
+	}
+
+	log.Printf("request: headers=%v body=%s", req.Headers, body)
+
 	timestamp := req.Headers["x-slack-request-timestamp"]
 	signature := req.Headers["x-slack-signature"]
 
-	if !verifySlackSignature(h.signingSecret, timestamp, req.Body, signature) {
+	if !verifySlackSignature(h.signingSecret, timestamp, body, signature) {
+		log.Printf("signature verification failed: ts=%s sig=%s", timestamp, signature)
 		return events.APIGatewayV2HTTPResponse{StatusCode: 401, Body: "invalid signature"}, nil
 	}
 
 	contentType := req.Headers["content-type"]
 
 	if strings.Contains(contentType, "application/x-www-form-urlencoded") {
-		return h.handleFormRequest(req.Body)
+		return h.handleFormRequest(body)
 	}
 
-	return h.handleJSONRequest(req.Body)
+	return h.handleJSONRequest(body)
 }
 
 func (h *lambdaHandler) handleFormRequest(body string) (events.APIGatewayV2HTTPResponse, error) {
