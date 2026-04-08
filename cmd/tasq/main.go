@@ -22,11 +22,22 @@ func main() {
 func run() error {
 	_ = godotenv.Load()
 
-	appToken := os.Getenv("SLACK_APP_TOKEN")
 	botToken := os.Getenv("SLACK_BOT_TOKEN")
+	if botToken == "" {
+		return fmt.Errorf("SLACK_BOT_TOKEN must be set")
+	}
 
-	if appToken == "" || botToken == "" {
-		return fmt.Errorf("SLACK_APP_TOKEN and SLACK_BOT_TOKEN must be set")
+	mode := os.Getenv("APP_MODE")
+
+	if mode == "http" {
+		api := slack.New(botToken)
+		return runLambda(api)
+	}
+
+	// SocketMode (default)
+	appToken := os.Getenv("SLACK_APP_TOKEN")
+	if appToken == "" {
+		return fmt.Errorf("SLACK_APP_TOKEN must be set for socket mode")
 	}
 
 	api := slack.New(botToken,
@@ -38,16 +49,17 @@ func run() error {
 		socketmode.OptionLog(log.New(os.Stdout, "socketmode: ", log.LstdFlags)),
 	)
 
-	cmdHandler := handler.NewCommandHandler(client)
-	reactionHandler := handler.NewReactionHandler(client, cmdHandler)
+	cmdHandler := handler.NewCommandHandler(api)
+	reactionHandler := handler.NewReactionHandler(api, cmdHandler)
+	shortcutHandler := handler.NewShortcutHandler(cmdHandler)
 
-	go handleEvents(client, cmdHandler, reactionHandler)
+	go handleEvents(client, cmdHandler, reactionHandler, shortcutHandler)
 
 	log.Println("rollcall starting...")
 	return client.Run()
 }
 
-func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler, reactionHandler *handler.ReactionHandler) {
+func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler, reactionHandler *handler.ReactionHandler, shortcutHandler *handler.ShortcutHandler) {
 	for evt := range client.Events {
 		switch evt.Type {
 		case socketmode.EventTypeSlashCommand:
@@ -55,7 +67,8 @@ func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler,
 			if !ok {
 				continue
 			}
-			go cmdHandler.Handle(evt, cmd)
+			client.Ack(*evt.Request)
+			go cmdHandler.Handle(cmd)
 
 		case socketmode.EventTypeEventsAPI:
 			eventsAPIEvent, ok := evt.Data.(slackevents.EventsAPIEvent)
@@ -65,8 +78,16 @@ func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler,
 			client.Ack(*evt.Request)
 
 			if inner, ok := handler.ExtractReactionEvent(eventsAPIEvent); ok {
-				go reactionHandler.Handle(evt, inner)
+				go reactionHandler.Handle(inner)
 			}
+
+		case socketmode.EventTypeInteractive:
+			callback, ok := evt.Data.(slack.InteractionCallback)
+			if !ok {
+				continue
+			}
+			client.Ack(*evt.Request)
+			go shortcutHandler.Handle(callback)
 
 		case socketmode.EventTypeConnecting:
 			log.Println("connecting to Slack...")
