@@ -16,6 +16,10 @@ import (
 	"strings"
 	"time"
 
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	awslambda "github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/lambda/types"
+
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/kurosawa-dev/rollcall/internal/handler"
@@ -23,8 +27,19 @@ import (
 	"github.com/slack-go/slack/slackevents"
 )
 
+// asyncTask is a payload for self-invocation to process events asynchronously.
+type asyncTask struct {
+	Async     bool   `json:"async"`
+	Type      string `json:"type"`       // "command", "shortcut", "reaction"
+	ChannelID string `json:"channel_id"`
+	MessageTS string `json:"message_ts"`
+	UserID    string `json:"user_id"`
+	Text      string `json:"text,omitempty"`
+}
+
 type lambdaHandler struct {
 	signingSecret   string
+	lambdaClient    *awslambda.Client
 	cmdHandler      *handler.CommandHandler
 	reactionHandler *handler.ReactionHandler
 	shortcutHandler *handler.ShortcutHandler
@@ -36,12 +51,18 @@ func runLambda(api *slack.Client) error {
 		return fmt.Errorf("SLACK_SIGNING_SECRET must be set for HTTP mode")
 	}
 
+	cfg, err := awsconfig.LoadDefaultConfig(context.Background())
+	if err != nil {
+		return fmt.Errorf("failed to load AWS config: %w", err)
+	}
+
 	cmdHandler := handler.NewCommandHandler(api)
 	reactionHandler := handler.NewReactionHandler(api, cmdHandler)
 	shortcutHandler := handler.NewShortcutHandler(cmdHandler)
 
 	h := &lambdaHandler{
 		signingSecret:   signingSecret,
+		lambdaClient:    awslambda.NewFromConfig(cfg),
 		cmdHandler:      cmdHandler,
 		reactionHandler: reactionHandler,
 		shortcutHandler: shortcutHandler,
@@ -52,7 +73,21 @@ func runLambda(api *slack.Client) error {
 	return nil
 }
 
-func (h *lambdaHandler) handleRequest(_ context.Context, req events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
+func (h *lambdaHandler) handleRequest(ctx context.Context, raw json.RawMessage) (events.APIGatewayV2HTTPResponse, error) {
+	// Check if this is an async self-invocation
+	var task asyncTask
+	if err := json.Unmarshal(raw, &task); err == nil && task.Async {
+		h.processAsync(task)
+		return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
+	}
+
+	// Otherwise, it's a Slack request via API Gateway
+	var req events.APIGatewayV2HTTPRequest
+	if err := json.Unmarshal(raw, &req); err != nil {
+		log.Printf("failed to parse API Gateway request: %v", err)
+		return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "bad request"}, nil
+	}
+
 	body := req.Body
 	if req.IsBase64Encoded {
 		decoded, err := base64.StdEncoding.DecodeString(body)
@@ -62,8 +97,6 @@ func (h *lambdaHandler) handleRequest(_ context.Context, req events.APIGatewayV2
 		}
 		body = string(decoded)
 	}
-
-	log.Printf("request: headers=%v body=%s", req.Headers, body)
 
 	timestamp := req.Headers["x-slack-request-timestamp"]
 	signature := req.Headers["x-slack-signature"]
@@ -76,13 +109,13 @@ func (h *lambdaHandler) handleRequest(_ context.Context, req events.APIGatewayV2
 	contentType := req.Headers["content-type"]
 
 	if strings.Contains(contentType, "application/x-www-form-urlencoded") {
-		return h.handleFormRequest(body)
+		return h.handleFormRequest(ctx, body)
 	}
 
-	return h.handleJSONRequest(body)
+	return h.handleJSONRequest(ctx, body)
 }
 
-func (h *lambdaHandler) handleFormRequest(body string) (events.APIGatewayV2HTTPResponse, error) {
+func (h *lambdaHandler) handleFormRequest(ctx context.Context, body string) (events.APIGatewayV2HTTPResponse, error) {
 	values, err := url.ParseQuery(body)
 	if err != nil {
 		return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "bad request"}, nil
@@ -95,22 +128,33 @@ func (h *lambdaHandler) handleFormRequest(body string) (events.APIGatewayV2HTTPR
 			log.Printf("failed to parse interaction payload: %v", err)
 			return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "bad payload"}, nil
 		}
-		h.shortcutHandler.Handle(callback)
+		h.invokeAsync(ctx, asyncTask{
+			Async:     true,
+			Type:      "shortcut",
+			ChannelID: callback.Channel.ID,
+			MessageTS: callback.Message.Timestamp,
+			UserID:    callback.User.ID,
+		})
 		return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
 	}
 
 	// Slash command
 	if values.Get("command") != "" {
 		cmd := parseSlashCommand(values)
-		h.cmdHandler.Handle(cmd)
+		h.invokeAsync(ctx, asyncTask{
+			Async:     true,
+			Type:      "command",
+			ChannelID: cmd.ChannelID,
+			UserID:    cmd.UserID,
+			Text:      cmd.Text,
+		})
 		return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
 	}
 
 	return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "unknown form request"}, nil
 }
 
-func (h *lambdaHandler) handleJSONRequest(body string) (events.APIGatewayV2HTTPResponse, error) {
-	// URL verification challenge
+func (h *lambdaHandler) handleJSONRequest(ctx context.Context, body string) (events.APIGatewayV2HTTPResponse, error) {
 	var envelope struct {
 		Type      string `json:"type"`
 		Challenge string `json:"challenge"`
@@ -127,7 +171,6 @@ func (h *lambdaHandler) handleJSONRequest(body string) (events.APIGatewayV2HTTPR
 		}, nil
 	}
 
-	// Events API callback
 	if envelope.Type == "event_callback" {
 		evt, err := slackevents.ParseEvent(json.RawMessage(body), slackevents.OptionNoVerifyToken())
 		if err != nil {
@@ -136,13 +179,54 @@ func (h *lambdaHandler) handleJSONRequest(body string) (events.APIGatewayV2HTTPR
 		}
 
 		if inner, ok := handler.ExtractReactionEvent(evt); ok {
-			h.reactionHandler.Handle(inner)
+			h.invokeAsync(ctx, asyncTask{
+				Async:     true,
+				Type:      "reaction",
+				ChannelID: inner.Item.Channel,
+				MessageTS: inner.Item.Timestamp,
+				UserID:    inner.User,
+			})
 		}
 
 		return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
 	}
 
 	return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
+}
+
+func (h *lambdaHandler) invokeAsync(ctx context.Context, task asyncTask) {
+	payload, err := json.Marshal(task)
+	if err != nil {
+		log.Printf("failed to marshal async task: %v", err)
+		return
+	}
+
+	funcName := os.Getenv("AWS_LAMBDA_FUNCTION_NAME")
+	_, err = h.lambdaClient.Invoke(ctx, &awslambda.InvokeInput{
+		FunctionName:   &funcName,
+		InvocationType: types.InvocationTypeEvent,
+		Payload:        payload,
+	})
+	if err != nil {
+		log.Printf("failed to invoke async: %v", err)
+	}
+}
+
+func (h *lambdaHandler) processAsync(task asyncTask) {
+	log.Printf("async processing: type=%s channel=%s ts=%s user=%s", task.Type, task.ChannelID, task.MessageTS, task.UserID)
+
+	switch task.Type {
+	case "shortcut":
+		h.cmdHandler.RunCheck(task.ChannelID, task.MessageTS, task.UserID, nil)
+	case "reaction":
+		h.cmdHandler.RunCheck(task.ChannelID, task.MessageTS, task.UserID, nil)
+	case "command":
+		h.cmdHandler.Handle(slack.SlashCommand{
+			ChannelID: task.ChannelID,
+			UserID:    task.UserID,
+			Text:      task.Text,
+		})
+	}
 }
 
 func parseSlashCommand(values url.Values) slack.SlashCommand {

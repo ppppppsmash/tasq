@@ -31,7 +31,7 @@ func (h *ReactionHandler) Handle(innerEvent *slackevents.ReactionAddedEvent) {
 	messageTS := innerEvent.Item.Timestamp
 
 	log.Printf("reaction trigger: channel=%s ts=%s by=%s", channelID, messageTS, innerEvent.User)
-	h.cmdHandler.runCheck(channelID, messageTS, innerEvent.User, nil)
+	h.cmdHandler.RunCheck(channelID, messageTS, innerEvent.User, nil)
 }
 
 // ExtractReactionEvent extracts a ReactionAddedEvent from an EventsAPI envelope.

@@ -45,7 +45,7 @@ func (h *CommandHandler) handleCheck(cmd slack.SlashCommand) {
 	}
 
 	log.Printf("check: channel=%s ts=%s args=%q groups=%d members", cmd.ChannelID, targetTS, args, len(groupMembers))
-	h.runCheck(cmd.ChannelID, targetTS, cmd.UserID, groupMembers)
+	h.RunCheck(cmd.ChannelID, targetTS, cmd.UserID, groupMembers)
 }
 
 func (h *CommandHandler) expandUserGroups(text string) ([]string, error) {

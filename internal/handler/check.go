@@ -19,7 +19,7 @@ type CheckResult struct {
 	UndoneUsers []string
 }
 
-func (h *CommandHandler) runCheck(channelID, messageTS, userID string, explicitGroupMembers []string) {
+func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitGroupMembers []string) {
 	msgs, err := h.client.GetConversationHistory(&slack.GetConversationHistoryParameters{
 		ChannelID: channelID,
 		Latest:    messageTS,
