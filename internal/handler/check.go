@@ -66,6 +66,10 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 	if err != nil {
 		log.Printf("warning: failed to filter bots: %v", err)
 	}
+	if len(targetUsers) == 0 {
+		h.respond(channelID, "Anyone? Anyone? ... No one's here.\nメッセージにメンション（@ユーザー）が含まれていないため、集計対象が見つかりませんでした。", messageTS)
+		return
+	}
 
 	doneSet := h.collectDoneUsers(channelID, messageTS)
 	result := buildResult(msg.Text, targetUsers, doneSet)
