@@ -233,7 +233,11 @@ func formatResult(r CheckResult) string {
 	doneCount := len(r.DoneUsers)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "Bueller?... Bueller?... Anyone?\n確認・対応が済んだら、✅リアクションをつけてください\n")
+	reactions := make([]string, len(CompletionReactions))
+	for i, r := range CompletionReactions {
+		reactions[i] = fmt.Sprintf(":%s:", r)
+	}
+	fmt.Fprintf(&b, "Bueller?... Bueller?... Anyone?\n%sリアクションで完了を教えてね！\n", strings.Join(reactions, " "))
 	fmt.Fprintf(&b, "\n\n")
 	fmt.Fprintf(&b, "対象: %d名\n", total)
 
