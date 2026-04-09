@@ -63,7 +63,47 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 
 	doneSet := h.collectDoneUsers(channelID, messageTS)
 	result := buildResult(msg.Text, targetUsers, doneSet)
-	h.respond(channelID, formatResult(result), messageTS)
+	text := formatResult(result)
+
+	// Update existing bot message in thread, or post new one
+	if existingTS := h.findBotMessage(channelID, messageTS); existingTS != "" {
+		h.updateMessage(channelID, existingTS, text)
+	} else {
+		h.respond(channelID, text, messageTS)
+	}
+}
+
+func (h *CommandHandler) findBotMessage(channelID, threadTS string) string {
+	// Get bot's own user ID
+	authTest, err := h.client.AuthTest()
+	if err != nil {
+		log.Printf("warning: failed to auth test: %v", err)
+		return ""
+	}
+	botUserID := authTest.UserID
+
+	msgs, _, _, err := h.client.GetConversationReplies(&slack.GetConversationRepliesParameters{
+		ChannelID: channelID,
+		Timestamp: threadTS,
+	})
+	if err != nil {
+		log.Printf("warning: failed to get thread replies: %v", err)
+		return ""
+	}
+
+	for _, m := range msgs {
+		if m.User == botUserID && m.Timestamp != threadTS {
+			return m.Timestamp
+		}
+	}
+	return ""
+}
+
+func (h *CommandHandler) updateMessage(channelID, messageTS, text string) {
+	_, _, _, err := h.client.UpdateMessage(channelID, messageTS, slack.MsgOptionText(text, false))
+	if err != nil {
+		log.Printf("failed to update message: %v", err)
+	}
 }
 
 func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, explicitGroupMembers []string) ([]string, error) {
