@@ -59,7 +59,7 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 		return
 	}
 	if len(targetUsers) == 0 {
-		h.respondEphemeral(channelID, userID, "no target users found")
+		h.respondEphemeral(channelID, userID, "Anyone? Anyone? ... No one's here.\nメッセージにメンション（@ユーザー）が含まれていないため、集計対象が見つかりませんでした。")
 		return
 	}
 
@@ -149,7 +149,6 @@ func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, expli
 // 	}
 // 	return allMembers, nil
 // }
-
 
 func (h *CommandHandler) filterBots(userIDs []string) ([]string, error) {
 	type result struct {
