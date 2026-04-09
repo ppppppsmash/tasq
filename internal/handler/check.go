@@ -3,11 +3,18 @@ package handler
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"strings"
 
 	"github.com/kurosawa-dev/rollcall/internal/mention"
 	"github.com/slack-go/slack"
 )
+
+var completionQuotes = []string{
+	"You're all my hero.",
+	"The question isn't what are we gonna do. You already did it.",
+	"Abe Froman would be proud.",
+}
 
 // CompletionReactions are reactions that count as "done".
 var CompletionReactions = []string{
@@ -226,7 +233,7 @@ func formatResult(r CheckResult) string {
 	doneCount := len(r.DoneUsers)
 
 	var b strings.Builder
-	fmt.Fprintf(&b, "確認・対応が済んだら、✅リアクションをつけてください\n")
+	fmt.Fprintf(&b, "Bueller?... Bueller?... Anyone?\n確認・対応が済んだら、✅リアクションをつけてください\n")
 	fmt.Fprintf(&b, "\n\n")
 	fmt.Fprintf(&b, "対象: %d名\n", total)
 
@@ -243,7 +250,8 @@ func formatResult(r CheckResult) string {
 	fmt.Fprintf(&b, "進捗: %d/%d（%d%%）", doneCount, total, pct)
 
 	if total > 0 && doneCount == total {
-		fmt.Fprintf(&b, "\n\n🎉全員完了しました！ありがとうございました！")
+		quote := completionQuotes[rand.Intn(len(completionQuotes))]
+		fmt.Fprintf(&b, "\n\n🎉%s", quote)
 	}
 
 	return b.String()
