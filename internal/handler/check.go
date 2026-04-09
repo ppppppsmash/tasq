@@ -92,14 +92,32 @@ func (h *CommandHandler) getChannelMembers(channelID string) ([]string, error) {
 }
 
 func (h *CommandHandler) filterBots(userIDs []string) ([]string, error) {
-	var humans []string
+	type result struct {
+		uid   string
+		isBot bool
+		err   error
+	}
+
+	ch := make(chan result, len(userIDs))
 	for _, uid := range userIDs {
-		info, err := h.client.GetUserInfo(uid)
-		if err != nil {
-			return nil, fmt.Errorf("get user info %s: %w", uid, err)
+		go func(uid string) {
+			info, err := h.client.GetUserInfo(uid)
+			if err != nil {
+				ch <- result{uid: uid, err: err}
+				return
+			}
+			ch <- result{uid: uid, isBot: info.IsBot || info.IsAppUser}
+		}(uid)
+	}
+
+	var humans []string
+	for range userIDs {
+		r := <-ch
+		if r.err != nil {
+			return nil, fmt.Errorf("get user info %s: %w", r.uid, r.err)
 		}
-		if !info.IsBot && !info.IsAppUser {
-			humans = append(humans, uid)
+		if !r.isBot {
+			humans = append(humans, r.uid)
 		}
 	}
 	return humans, nil
