@@ -178,7 +178,7 @@ func (h *lambdaHandler) handleJSONRequest(ctx context.Context, body string) (eve
 			return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "bad event"}, nil
 		}
 
-		if inner, ok := handler.ExtractReactionEvent(evt); ok {
+		if inner, ok := handler.ExtractReactionEvent(evt); ok && inner.Reaction == handler.TriggerReaction {
 			h.invokeAsync(ctx, asyncTask{
 				Async:     true,
 				Type:      "reaction",
