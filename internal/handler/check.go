@@ -21,7 +21,6 @@ var CompletionReactions = []string{
 	"white_check_mark",
 	"taiouzumi",
 	"済",
-	"太い丸",
 	"対応しました",
 	"確認_済",
 	"完了",
@@ -59,7 +58,7 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 		return
 	}
 	if len(targetUsers) == 0 {
-		h.respondEphemeral(channelID, userID, "Anyone? Anyone? ... No one's here.\nメッセージにメンション（@ユーザー）が含まれていないため、集計対象が見つかりませんでした。")
+		h.respond(channelID, "Anyone? Anyone? ... No one's here.\nメッセージにメンション（@ユーザー）が含まれていないため、集計対象が見つかりませんでした。", messageTS)
 		return
 	}
 
