@@ -30,7 +30,7 @@ import (
 // asyncTask is a payload for self-invocation to process events asynchronously.
 type asyncTask struct {
 	Async     bool   `json:"async"`
-	Type      string `json:"type"`       // "command", "shortcut", "reaction"
+	Type      string `json:"type"`       // "command", "shortcut", "reaction", "mention"
 	ChannelID string `json:"channel_id"`
 	MessageTS string `json:"message_ts"`
 	UserID    string `json:"user_id"`
@@ -38,11 +38,12 @@ type asyncTask struct {
 }
 
 type lambdaHandler struct {
-	signingSecret   string
-	lambdaClient    *awslambda.Client
-	cmdHandler      *handler.CommandHandler
+	signingSecret  string
+	lambdaClient   *awslambda.Client
+	cmdHandler     *handler.CommandHandler
 	reactionHandler *handler.ReactionHandler
 	shortcutHandler *handler.ShortcutHandler
+	mentionHandler  *handler.MentionHandler
 }
 
 func runLambda(api *slack.Client) error {
@@ -59,13 +60,15 @@ func runLambda(api *slack.Client) error {
 	cmdHandler := handler.NewCommandHandler(api)
 	reactionHandler := handler.NewReactionHandler(api, cmdHandler)
 	shortcutHandler := handler.NewShortcutHandler(cmdHandler)
+	mentionHandler := handler.NewMentionHandler(cmdHandler)
 
 	h := &lambdaHandler{
-		signingSecret:   signingSecret,
-		lambdaClient:    awslambda.NewFromConfig(cfg),
-		cmdHandler:      cmdHandler,
+		signingSecret:  signingSecret,
+		lambdaClient:   awslambda.NewFromConfig(cfg),
+		cmdHandler:     cmdHandler,
 		reactionHandler: reactionHandler,
 		shortcutHandler: shortcutHandler,
+		mentionHandler:  mentionHandler,
 	}
 
 	log.Println("rollcall starting in HTTP (Lambda) mode...")
@@ -187,6 +190,19 @@ func (h *lambdaHandler) handleJSONRequest(ctx context.Context, body string) (eve
 				UserID:    inner.User,
 			})
 		}
+		if inner, ok := handler.ExtractMentionEvent(evt); ok {
+			messageTS := inner.ThreadTimeStamp
+			if messageTS == "" {
+				messageTS = inner.TimeStamp
+			}
+			h.invokeAsync(ctx, asyncTask{
+				Async:     true,
+				Type:      "mention",
+				ChannelID: inner.Channel,
+				MessageTS: messageTS,
+				UserID:    inner.User,
+			})
+		}
 
 		return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
 	}
@@ -216,9 +232,7 @@ func (h *lambdaHandler) processAsync(task asyncTask) {
 	log.Printf("async processing: type=%s channel=%s ts=%s user=%s", task.Type, task.ChannelID, task.MessageTS, task.UserID)
 
 	switch task.Type {
-	case "shortcut":
-		h.cmdHandler.RunCheck(task.ChannelID, task.MessageTS, task.UserID, nil)
-	case "reaction":
+	case "shortcut", "reaction", "mention":
 		h.cmdHandler.RunCheck(task.ChannelID, task.MessageTS, task.UserID, nil)
 	case "command":
 		h.cmdHandler.Handle(slack.SlashCommand{

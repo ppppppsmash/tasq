@@ -52,14 +52,15 @@ func run() error {
 	cmdHandler := handler.NewCommandHandler(api)
 	reactionHandler := handler.NewReactionHandler(api, cmdHandler)
 	shortcutHandler := handler.NewShortcutHandler(cmdHandler)
+	mentionHandler := handler.NewMentionHandler(cmdHandler)
 
-	go handleEvents(client, cmdHandler, reactionHandler, shortcutHandler)
+	go handleEvents(client, cmdHandler, reactionHandler, shortcutHandler, mentionHandler)
 
 	log.Println("rollcall starting...")
 	return client.Run()
 }
 
-func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler, reactionHandler *handler.ReactionHandler, shortcutHandler *handler.ShortcutHandler) {
+func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler, reactionHandler *handler.ReactionHandler, shortcutHandler *handler.ShortcutHandler, mentionHandler *handler.MentionHandler) {
 	for evt := range client.Events {
 		switch evt.Type {
 		case socketmode.EventTypeSlashCommand:
@@ -79,6 +80,9 @@ func handleEvents(client *socketmode.Client, cmdHandler *handler.CommandHandler,
 
 			if inner, ok := handler.ExtractReactionEvent(eventsAPIEvent); ok {
 				go reactionHandler.Handle(inner)
+			}
+			if inner, ok := handler.ExtractMentionEvent(eventsAPIEvent); ok {
+				go mentionHandler.Handle(inner)
 			}
 
 		case socketmode.EventTypeInteractive:
