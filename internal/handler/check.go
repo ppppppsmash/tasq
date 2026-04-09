@@ -19,7 +19,7 @@ type CheckResult struct {
 	UndoneUsers []string
 }
 
-func (h *CommandHandler) runCheck(channelID, messageTS string, explicitGroupMembers []string) {
+func (h *CommandHandler) runCheck(channelID, messageTS, userID string, explicitGroupMembers []string) {
 	msgs, err := h.client.GetConversationHistory(&slack.GetConversationHistoryParameters{
 		ChannelID: channelID,
 		Latest:    messageTS,
@@ -27,22 +27,22 @@ func (h *CommandHandler) runCheck(channelID, messageTS string, explicitGroupMemb
 		Limit:     1,
 	})
 	if err != nil {
-		h.respond(channelID, fmt.Sprintf("error fetching message: %v", err))
+		h.respondEphemeral(channelID, userID, fmt.Sprintf("error fetching message: %v", err))
 		return
 	}
 	if len(msgs.Messages) == 0 {
-		h.respond(channelID, "message not found")
+		h.respondEphemeral(channelID, userID, "message not found")
 		return
 	}
 	msg := msgs.Messages[0]
 
 	targetUsers, err := h.resolveTargetUsers(channelID, msg.Text, explicitGroupMembers)
 	if err != nil {
-		h.respond(channelID, fmt.Sprintf("error resolving target users: %v", err))
+		h.respondEphemeral(channelID, userID, fmt.Sprintf("error resolving target users: %v", err))
 		return
 	}
 	if len(targetUsers) == 0 {
-		h.respond(channelID, "no target users found")
+		h.respondEphemeral(channelID, userID, "no target users found")
 		return
 	}
 
@@ -53,7 +53,7 @@ func (h *CommandHandler) runCheck(channelID, messageTS string, explicitGroupMemb
 
 	doneSet := h.collectDoneUsers(channelID, messageTS)
 	result := buildResult(msg.Text, targetUsers, doneSet)
-	h.respond(channelID, formatResult(result))
+	h.respond(channelID, formatResult(result), messageTS)
 }
 
 func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, explicitGroupMembers []string) ([]string, error) {

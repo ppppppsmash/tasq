@@ -25,5 +25,5 @@ func (h *ShortcutHandler) Handle(callback slack.InteractionCallback) {
 	messageTS := callback.Message.Timestamp
 
 	log.Printf("shortcut trigger: channel=%s ts=%s by=%s", channelID, messageTS, callback.User.ID)
-	h.cmdHandler.runCheck(channelID, messageTS, nil)
+	h.cmdHandler.runCheck(channelID, messageTS, callback.User.ID, nil)
 }

@@ -24,7 +24,7 @@ func (h *CommandHandler) Handle(cmd slack.SlashCommand) {
 	case subcommand == "check" || strings.HasPrefix(subcommand, "check "):
 		h.handleCheck(cmd)
 	default:
-		h.respond(cmd.ChannelID, fmt.Sprintf("unknown subcommand: `%s`\nusage: `/rollcall check`", subcommand))
+		h.respondEphemeral(cmd.ChannelID, cmd.UserID, fmt.Sprintf("unknown subcommand: `%s`\nusage: `/rollcall check`", subcommand))
 	}
 }
 
@@ -33,19 +33,19 @@ func (h *CommandHandler) handleCheck(cmd slack.SlashCommand) {
 
 	targetTS, err := resolveTargetMessage(cmd, args)
 	if err != nil {
-		h.respond(cmd.ChannelID, fmt.Sprintf("error: %v", err))
+		h.respondEphemeral(cmd.ChannelID, cmd.UserID, fmt.Sprintf("error: %v", err))
 		return
 	}
 
 	// Expand usergroup mentions in args
 	groupMembers, err := h.expandUserGroups(args)
 	if err != nil {
-		h.respond(cmd.ChannelID, fmt.Sprintf("error expanding usergroups: %v", err))
+		h.respondEphemeral(cmd.ChannelID, cmd.UserID, fmt.Sprintf("error expanding usergroups: %v", err))
 		return
 	}
 
 	log.Printf("check: channel=%s ts=%s args=%q groups=%d members", cmd.ChannelID, targetTS, args, len(groupMembers))
-	h.runCheck(cmd.ChannelID, targetTS, groupMembers)
+	h.runCheck(cmd.ChannelID, targetTS, cmd.UserID, groupMembers)
 }
 
 func (h *CommandHandler) expandUserGroups(text string) ([]string, error) {
@@ -71,8 +71,19 @@ func (h *CommandHandler) expandUserGroups(text string) ([]string, error) {
 	return members, nil
 }
 
-func (h *CommandHandler) respond(channel, text string) {
-	_, _, err := h.client.PostMessage(channel, slack.MsgOptionText(text, false))
+func (h *CommandHandler) respondEphemeral(channel, userID, text string) {
+	_, err := h.client.PostEphemeral(channel, userID, slack.MsgOptionText(text, false))
+	if err != nil {
+		log.Printf("failed to post ephemeral message: %v", err)
+	}
+}
+
+func (h *CommandHandler) respond(channel, text string, threadTS ...string) {
+	opts := []slack.MsgOption{slack.MsgOptionText(text, false)}
+	if len(threadTS) > 0 && threadTS[0] != "" {
+		opts = append(opts, slack.MsgOptionTS(threadTS[0]))
+	}
+	_, _, err := h.client.PostMessage(channel, opts...)
 	if err != nil {
 		log.Printf("failed to post message: %v", err)
 	}
