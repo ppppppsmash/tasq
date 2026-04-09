@@ -10,7 +10,17 @@ import (
 )
 
 // CompletionReactions are reactions that count as "done".
-var CompletionReactions = []string{"white_check_mark"}
+var CompletionReactions = []string{
+	"white_check_mark",
+	"taiouzumi",
+	"済",
+	"太い丸",
+	"対応しました",
+	"確認_済",
+	"完了",
+	"承知_しました",
+	"kakuninzumi",
+}
 
 type CheckResult struct {
 	MessageText string
