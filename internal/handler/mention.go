@@ -15,15 +15,14 @@ func NewMentionHandler(cmdHandler *CommandHandler) *MentionHandler {
 }
 
 func (h *MentionHandler) Handle(event *slackevents.AppMentionEvent) {
+	// Ignore mentions in threads
+	if event.ThreadTimeStamp != "" {
+		return
+	}
+
 	channelID := event.Channel
 	userID := event.User
-
-	// If mentioned in a thread, check the parent message
-	// If mentioned in a top-level message, check that message itself
-	messageTS := event.ThreadTimeStamp
-	if messageTS == "" {
-		messageTS = event.TimeStamp
-	}
+	messageTS := event.TimeStamp
 
 	log.Printf("mention trigger: channel=%s ts=%s by=%s", channelID, messageTS, userID)
 	h.cmdHandler.RunCheck(channelID, messageTS, userID, nil)

@@ -190,16 +190,12 @@ func (h *lambdaHandler) handleJSONRequest(ctx context.Context, body string) (eve
 				UserID:    inner.User,
 			})
 		}
-		if inner, ok := handler.ExtractMentionEvent(evt); ok {
-			messageTS := inner.ThreadTimeStamp
-			if messageTS == "" {
-				messageTS = inner.TimeStamp
-			}
+		if inner, ok := handler.ExtractMentionEvent(evt); ok && inner.ThreadTimeStamp == "" {
 			h.invokeAsync(ctx, asyncTask{
 				Async:     true,
 				Type:      "mention",
 				ChannelID: inner.Channel,
-				MessageTS: messageTS,
+				MessageTS: inner.TimeStamp,
 				UserID:    inner.User,
 			})
 		}

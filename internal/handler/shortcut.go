@@ -21,6 +21,11 @@ func (h *ShortcutHandler) Handle(callback slack.InteractionCallback) {
 		return
 	}
 
+	// Ignore shortcuts on thread replies
+	if callback.Message.ThreadTimestamp != "" && callback.Message.ThreadTimestamp != callback.Message.Timestamp {
+		return
+	}
+
 	channelID := callback.Channel.ID
 	messageTS := callback.Message.Timestamp
 
