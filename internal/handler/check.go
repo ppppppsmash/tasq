@@ -230,10 +230,6 @@ func formatResult(r CheckResult) string {
 	fmt.Fprintf(&b, "\n\n")
 	fmt.Fprintf(&b, "対象: %d名\n", total)
 
-	if doneCount > 0 {
-		fmt.Fprintf(&b, "✅ 完了（%d名）", doneCount)
-		fmt.Fprintf(&b, "%s\n", formatUserList(r.DoneUsers))
-	}
 	if len(r.UndoneUsers) > 0 {
 		fmt.Fprintf(&b, "❌ 未完了（%d名）", len(r.UndoneUsers))
 		fmt.Fprintf(&b, "%s\n", formatUserList(r.UndoneUsers))
