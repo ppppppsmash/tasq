@@ -41,7 +41,7 @@ type lambdaHandler struct {
 	signingSecret  string
 	lambdaClient   *awslambda.Client
 	cmdHandler     *handler.CommandHandler
-	reactionHandler *handler.ReactionHandler
+	// reactionHandler *handler.ReactionHandler
 	shortcutHandler *handler.ShortcutHandler
 	mentionHandler  *handler.MentionHandler
 }
@@ -58,7 +58,7 @@ func runLambda(api *slack.Client) error {
 	}
 
 	cmdHandler := handler.NewCommandHandler(api)
-	reactionHandler := handler.NewReactionHandler(api, cmdHandler)
+	// reactionHandler := handler.NewReactionHandler(api, cmdHandler)
 	shortcutHandler := handler.NewShortcutHandler(cmdHandler)
 	mentionHandler := handler.NewMentionHandler(cmdHandler)
 
@@ -66,7 +66,7 @@ func runLambda(api *slack.Client) error {
 		signingSecret:  signingSecret,
 		lambdaClient:   awslambda.NewFromConfig(cfg),
 		cmdHandler:     cmdHandler,
-		reactionHandler: reactionHandler,
+		// reactionHandler: reactionHandler,
 		shortcutHandler: shortcutHandler,
 		mentionHandler:  mentionHandler,
 	}
@@ -181,15 +181,16 @@ func (h *lambdaHandler) handleJSONRequest(ctx context.Context, body string) (eve
 			return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "bad event"}, nil
 		}
 
-		if inner, ok := handler.ExtractReactionEvent(evt); ok && inner.Reaction == handler.TriggerReaction {
-			h.invokeAsync(ctx, asyncTask{
-				Async:     true,
-				Type:      "reaction",
-				ChannelID: inner.Item.Channel,
-				MessageTS: inner.Item.Timestamp,
-				UserID:    inner.User,
-			})
-		}
+		// Reaction trigger disabled
+		// if inner, ok := handler.ExtractReactionEvent(evt); ok && inner.Reaction == handler.TriggerReaction {
+		// 	h.invokeAsync(ctx, asyncTask{
+		// 		Async:     true,
+		// 		Type:      "reaction",
+		// 		ChannelID: inner.Item.Channel,
+		// 		MessageTS: inner.Item.Timestamp,
+		// 		UserID:    inner.User,
+		// 	})
+		// }
 		if inner, ok := handler.ExtractMentionEvent(evt); ok && inner.ThreadTimeStamp == "" {
 			h.invokeAsync(ctx, asyncTask{
 				Async:     true,
