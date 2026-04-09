@@ -123,30 +123,33 @@ func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, expli
 		return mentioned, nil
 	}
 
-	return h.getChannelMembers(channelID)
+	// Fallback to all channel members (disabled to avoid accidental mass mention)
+	// return h.getChannelMembers(channelID)
+	return nil, nil
 }
 
-func (h *CommandHandler) getChannelMembers(channelID string) ([]string, error) {
-	var allMembers []string
-	cursor := ""
-	for {
-		params := &slack.GetUsersInConversationParameters{
-			ChannelID: channelID,
-			Cursor:    cursor,
-			Limit:     200,
-		}
-		members, nextCursor, err := h.client.GetUsersInConversation(params)
-		if err != nil {
-			return nil, err
-		}
-		allMembers = append(allMembers, members...)
-		if nextCursor == "" {
-			break
-		}
-		cursor = nextCursor
-	}
-	return allMembers, nil
-}
+// func (h *CommandHandler) getChannelMembers(channelID string) ([]string, error) {
+// 	var allMembers []string
+// 	cursor := ""
+// 	for {
+// 		params := &slack.GetUsersInConversationParameters{
+// 			ChannelID: channelID,
+// 			Cursor:    cursor,
+// 			Limit:     200,
+// 		}
+// 		members, nextCursor, err := h.client.GetUsersInConversation(params)
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 		allMembers = append(allMembers, members...)
+// 		if nextCursor == "" {
+// 			break
+// 		}
+// 		cursor = nextCursor
+// 	}
+// 	return allMembers, nil
+// }
+
 
 func (h *CommandHandler) filterBots(userIDs []string) ([]string, error) {
 	type result struct {
