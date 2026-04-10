@@ -121,9 +121,33 @@ func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, expli
 		return explicitGroupMembers, nil
 	}
 
-	mentioned := mention.Parse(messageText)
-	if len(mentioned) > 0 {
-		return mentioned, nil
+	seen := make(map[string]bool)
+	var users []string
+
+	// Individual mentions
+	for _, uid := range mention.Parse(messageText) {
+		if !seen[uid] {
+			seen[uid] = true
+			users = append(users, uid)
+		}
+	}
+
+	// Usergroup mentions in message text
+	for _, gid := range mention.ParseUserGroups(messageText) {
+		members, err := h.client.GetUserGroupMembers(gid)
+		if err != nil {
+			return nil, fmt.Errorf("get members of %s: %w", gid, err)
+		}
+		for _, uid := range members {
+			if !seen[uid] {
+				seen[uid] = true
+				users = append(users, uid)
+			}
+		}
+	}
+
+	if len(users) > 0 {
+		return users, nil
 	}
 
 	// Fallback to all channel members (disabled to avoid accidental mass mention)
