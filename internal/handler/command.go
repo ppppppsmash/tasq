@@ -9,14 +9,17 @@ import (
 	"github.com/slack-go/slack"
 )
 
+// CommandHandler Slackのスラッシュコマンドやイベントを処理するハンドラー
 type CommandHandler struct {
 	client *slack.Client
 }
 
+// NewCommandHandler Slackクライアントを受け取ってハンドラーを生成する
 func NewCommandHandler(client *slack.Client) *CommandHandler {
 	return &CommandHandler{client: client}
 }
 
+// Handle スラッシュコマンドをサブコマンドに振り分ける
 func (h *CommandHandler) Handle(cmd slack.SlashCommand) {
 	subcommand := strings.TrimSpace(cmd.Text)
 
@@ -28,16 +31,18 @@ func (h *CommandHandler) Handle(cmd slack.SlashCommand) {
 	}
 }
 
+// handleCheck /rollcall checkの処理。対象メッセージとグループを解決してRunCheckに渡す
 func (h *CommandHandler) handleCheck(cmd slack.SlashCommand) {
 	args := strings.TrimSpace(strings.TrimPrefix(cmd.Text, "check"))
 
+	// スレッド元またはリンクから対象メッセージを特定
 	targetTS, err := resolveTargetMessage(cmd, args)
 	if err != nil {
 		h.respondEphemeral(cmd.ChannelID, cmd.UserID, fmt.Sprintf("error: %v", err))
 		return
 	}
 
-	// Expand usergroup mentions in args
+	// コマンド引数中のユーザーグループを展開
 	groupMembers, err := h.expandUserGroups(args)
 	if err != nil {
 		h.respondEphemeral(cmd.ChannelID, cmd.UserID, fmt.Sprintf("error expanding usergroups: %v", err))
@@ -48,6 +53,7 @@ func (h *CommandHandler) handleCheck(cmd slack.SlashCommand) {
 	h.RunCheck(cmd.ChannelID, targetTS, cmd.UserID, groupMembers)
 }
 
+// expandUserGroups テキスト中のユーザーグループメンションをメンバー一覧に展開する
 func (h *CommandHandler) expandUserGroups(text string) ([]string, error) {
 	groupIDs := mention.ParseUserGroups(text)
 	if len(groupIDs) == 0 {
@@ -71,6 +77,7 @@ func (h *CommandHandler) expandUserGroups(text string) ([]string, error) {
 	return members, nil
 }
 
+// respondEphemeral 実行者だけに見えるエフェメラルメッセージを送信する
 func (h *CommandHandler) respondEphemeral(channel, userID, text string) {
 	_, err := h.client.PostEphemeral(channel, userID, slack.MsgOptionText(text, false))
 	if err != nil {
@@ -78,6 +85,7 @@ func (h *CommandHandler) respondEphemeral(channel, userID, text string) {
 	}
 }
 
+// respond チャンネルにメッセージを投稿する（threadTS指定時はスレッド返信）
 func (h *CommandHandler) respond(channel, text string, threadTS ...string) {
 	opts := []slack.MsgOption{slack.MsgOptionText(text, false)}
 	if len(threadTS) > 0 && threadTS[0] != "" {

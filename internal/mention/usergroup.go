@@ -4,10 +4,10 @@ import (
 	"regexp"
 )
 
-// Slack usergroup mention: <!subteam^S12345> or <!subteam^S12345|@group-name>
+// Slackのユーザーグループメンションパターン（例: <!subteam^S12345>、<!subteam^S12345|@group-name>）
 var usergroupRe = regexp.MustCompile(`<!subteam\^(S[A-Z0-9]+)(?:\|[^>]*)?>`)
 
-// ParseUserGroups extracts usergroup IDs from text.
+// ParseUserGroups テキストからユーザーグループIDを抽出する
 func ParseUserGroups(text string) []string {
 	matches := usergroupRe.FindAllStringSubmatch(text, -1)
 	seen := make(map[string]bool)

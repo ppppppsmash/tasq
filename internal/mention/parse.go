@@ -5,17 +5,16 @@ import (
 	"strings"
 )
 
-// Slack user mention: <@U12345> or <@U12345|name>
+// Slackの個人メンションパターン（例: <@U12345>、<@U12345|name>）
 var userMentionRe = regexp.MustCompile(`<@(U[A-Z0-9]+)(?:\|[^>]*)?>`)
 
-// Parentheses (half-width and full-width)
+// 半角・全角カッコのパターン
 var parenRe = regexp.MustCompile(`(?:\([^)]*\)|（[^）]*）)`)
 
-// CC: prefix — everything after CC: or cc: is excluded
+// CC:以降を除外するパターン
 var ccRe = regexp.MustCompile(`(?i)cc\s*[:：].*`)
 
-// Parse extracts user IDs mentioned in text,
-// excluding mentions inside parentheses and after CC:/cc:.
+// Parse テキストからメンションされたユーザーIDを抽出する（カッコ内やCC:以降は除外）
 func Parse(text string) []string {
 	cleaned := excludeRegions(text)
 
@@ -32,16 +31,16 @@ func Parse(text string) []string {
 	return users
 }
 
-// excludeRegions removes parenthesized regions and CC: suffix from text.
+// excludeRegions カッコ内とCC:以降を除去する
 func excludeRegions(text string) string {
-	// Remove CC: and everything after it (per line)
+	// 各行のCC:以降を除去
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		lines[i] = ccRe.ReplaceAllString(line, "")
 	}
 	text = strings.Join(lines, "\n")
 
-	// Remove parenthesized regions
+	// カッコ内を除去
 	text = parenRe.ReplaceAllString(text, "")
 
 	return text

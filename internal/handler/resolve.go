@@ -8,28 +8,26 @@ import (
 	"github.com/slack-go/slack"
 )
 
-// Slack message link pattern:
-// https://xxx.slack.com/archives/C12345/p1234567890123456
+// Slackメッセージリンクのパターン（例: https://xxx.slack.com/archives/C12345/p1234567890123456）
 var messageLinkRe = regexp.MustCompile(`/archives/([A-Z0-9]+)/p(\d{10})(\d{6})`)
 
+// resolveTargetMessage コマンド引数からチェック対象メッセージのタイムスタンプを特定する
 func resolveTargetMessage(cmd slack.SlashCommand, args string) (string, error) {
-	// Case 1: message link in args
+	// 引数にメッセージリンクがあればそれを使う
 	if link := extractMessageLink(args); link != "" {
 		return link, nil
 	}
 
-	// Case 2: invoked in a thread — use the thread parent
+	// スレッドからの実行時は親メッセージを使う（未実装）
 	if cmd.ChannelID != "" && isThreadReply(cmd) {
-		// SlashCommand doesn't directly expose thread_ts,
-		// but if triggered from a thread, the trigger_id context may help.
-		// For now, we rely on the message link approach or future event-based detection.
 	}
 
 	return "", fmt.Errorf("specify a message link: `/rollcall check <message URL>`")
 }
 
+// extractMessageLink テキストからSlackメッセージリンクを抽出してタイムスタンプに変換する
 func extractMessageLink(text string) string {
-	// Slack auto-formats URLs as <URL|label> or <URL>
+	// Slackが自動的にURLを<URL|label>や<URL>形式にする
 	cleaned := strings.Trim(text, "<>")
 	if idx := strings.Index(cleaned, "|"); idx >= 0 {
 		cleaned = cleaned[:idx]
@@ -40,12 +38,11 @@ func extractMessageLink(text string) string {
 		return ""
 	}
 
-	// Convert p1234567890123456 → 1234567890.123456
+	// p1234567890123456 → 1234567890.123456に変換
 	return matches[2] + "." + matches[3]
 }
 
+// isThreadReply スレッド返信からの実行かどうか判定する（SlashCommandにthread_tsがないため未実装）
 func isThreadReply(cmd slack.SlashCommand) bool {
-	// SlashCommand doesn't natively carry thread_ts.
-	// This is a placeholder for future implementation.
 	return false
 }

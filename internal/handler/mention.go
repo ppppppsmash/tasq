@@ -6,16 +6,19 @@ import (
 	"github.com/slack-go/slack/slackevents"
 )
 
+// MentionHandler botへのメンションで集計を実行するハンドラー
 type MentionHandler struct {
 	cmdHandler *CommandHandler
 }
 
+// NewMentionHandler メンションハンドラーを生成する
 func NewMentionHandler(cmdHandler *CommandHandler) *MentionHandler {
 	return &MentionHandler{cmdHandler: cmdHandler}
 }
 
+// Handle botがメンションされたメッセージで集計を実行する（スレッド内は無視）
 func (h *MentionHandler) Handle(event *slackevents.AppMentionEvent) {
-	// Ignore mentions in threads
+	// スレッド内のメンションは無視
 	if event.ThreadTimeStamp != "" {
 		return
 	}
@@ -28,7 +31,7 @@ func (h *MentionHandler) Handle(event *slackevents.AppMentionEvent) {
 	h.cmdHandler.RunCheck(channelID, messageTS, userID, nil)
 }
 
-// ExtractMentionEvent extracts an AppMentionEvent from an EventsAPI envelope.
+// ExtractMentionEvent EventsAPIイベントからAppMentionEventを取り出す
 func ExtractMentionEvent(eventsAPIEvent slackevents.EventsAPIEvent) (*slackevents.AppMentionEvent, bool) {
 	inner, ok := eventsAPIEvent.InnerEvent.Data.(*slackevents.AppMentionEvent)
 	return inner, ok

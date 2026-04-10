@@ -10,13 +10,14 @@ import (
 	"github.com/slack-go/slack"
 )
 
+// 全員完了時に表示するランダム引用文
 var completionQuotes = []string{
 	"You're all my hero.",
 	"The question isn't what are we gonna do. You already did it.",
 	"Abe Froman would be proud.",
 }
 
-// CompletionReactions are reactions that count as "done".
+// 「完了」として扱うリアクション一覧
 var CompletionReactions = []string{
 	"white_check_mark",
 	"taiouzumi",
@@ -28,6 +29,7 @@ var CompletionReactions = []string{
 	"kakuninzumi",
 }
 
+// 集計結果を保持する構造体
 type CheckResult struct {
 	MessageText string
 	TargetUsers []string
@@ -35,7 +37,9 @@ type CheckResult struct {
 	UndoneUsers []string
 }
 
+// RunCheck 対象メッセージのリアクションを集計して進捗を投稿する
 func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitGroupMembers []string) {
+	// 対象メッセージを取得
 	msgs, err := h.client.GetConversationHistory(&slack.GetConversationHistoryParameters{
 		ChannelID: channelID,
 		Latest:    messageTS,
@@ -52,6 +56,7 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 	}
 	msg := msgs.Messages[0]
 
+	// メンションやユーザーグループから対象ユーザーを特定
 	targetUsers, err := h.resolveTargetUsers(channelID, msg.Text, explicitGroupMembers)
 	if err != nil {
 		h.respondEphemeral(channelID, userID, fmt.Sprintf("error resolving target users: %v", err))
@@ -62,6 +67,7 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 		return
 	}
 
+	// botユーザーを除外
 	targetUsers, err = h.filterBots(targetUsers)
 	if err != nil {
 		log.Printf("warning: failed to filter bots: %v", err)
@@ -71,11 +77,12 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 		return
 	}
 
+	// リアクション済みユーザーを収集して結果を組み立てる
 	doneSet := h.collectDoneUsers(channelID, messageTS)
 	result := buildResult(msg.Text, targetUsers, doneSet)
 	text := formatResult(result)
 
-	// Update existing bot message in thread, or post new one
+	// 既存のbot投稿があれば更新、なければ新規投稿
 	if existingTS := h.findBotMessage(channelID, messageTS); existingTS != "" {
 		h.updateMessage(channelID, existingTS, text)
 	} else {
@@ -83,8 +90,9 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 	}
 }
 
+// findBotMessage スレッド内の既存bot投稿のタイムスタンプを返す
 func (h *CommandHandler) findBotMessage(channelID, threadTS string) string {
-	// Get bot's own user ID
+	// botの自身のユーザーIDを取得
 	authTest, err := h.client.AuthTest()
 	if err != nil {
 		log.Printf("warning: failed to auth test: %v", err)
@@ -109,6 +117,7 @@ func (h *CommandHandler) findBotMessage(channelID, threadTS string) string {
 	return ""
 }
 
+// updateMessage 既存メッセージを更新する
 func (h *CommandHandler) updateMessage(channelID, messageTS, text string) {
 	_, _, _, err := h.client.UpdateMessage(channelID, messageTS, slack.MsgOptionText(text, false))
 	if err != nil {
@@ -116,7 +125,9 @@ func (h *CommandHandler) updateMessage(channelID, messageTS, text string) {
 	}
 }
 
+// resolveTargetUsers 対象ユーザーを特定する（コマンド引数のグループ > 本文メンション > 本文グループ）
 func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, explicitGroupMembers []string) ([]string, error) {
+	// コマンド引数でグループが指定されていればそれを優先
 	if len(explicitGroupMembers) > 0 {
 		return explicitGroupMembers, nil
 	}
@@ -124,7 +135,7 @@ func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, expli
 	seen := make(map[string]bool)
 	var users []string
 
-	// Individual mentions
+	// 本文中の個人メンションを抽出
 	for _, uid := range mention.Parse(messageText) {
 		if !seen[uid] {
 			seen[uid] = true
@@ -132,7 +143,7 @@ func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, expli
 		}
 	}
 
-	// Usergroup mentions in message text
+	// 本文中のユーザーグループを展開してマージ
 	groupMembers, err := h.expandUserGroups(messageText)
 	if err != nil {
 		return nil, err
@@ -148,7 +159,7 @@ func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, expli
 		return users, nil
 	}
 
-	// Fallback to all channel members (disabled to avoid accidental mass mention)
+	// チャンネル全員へのフォールバック（誤爆防止のため無効化中）
 	// return h.getChannelMembers(channelID)
 	return nil, nil
 }
@@ -175,6 +186,7 @@ func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, expli
 // 	return allMembers, nil
 // }
 
+// filterBots botユーザーを並行で判定して除外する
 func (h *CommandHandler) filterBots(userIDs []string) ([]string, error) {
 	type result struct {
 		uid   string
@@ -207,6 +219,7 @@ func (h *CommandHandler) filterBots(userIDs []string) ([]string, error) {
 	return humans, nil
 }
 
+// collectDoneUsers 対象メッセージの完了リアクションをつけたユーザーを収集する
 func (h *CommandHandler) collectDoneUsers(channelID, messageTS string) map[string]bool {
 	done := make(map[string]bool)
 
@@ -229,6 +242,7 @@ func (h *CommandHandler) collectDoneUsers(channelID, messageTS string) map[strin
 	return done
 }
 
+// isCompletionReaction リアクション名が完了扱いかどうか判定する
 func isCompletionReaction(name string) bool {
 	for _, r := range CompletionReactions {
 		if name == r {
@@ -238,6 +252,7 @@ func isCompletionReaction(name string) bool {
 	return false
 }
 
+// buildResult 対象ユーザーを完了/未完了に振り分けて結果を構築する
 func buildResult(messageText string, targetUsers []string, doneSet map[string]bool) CheckResult {
 	var done, undone []string
 	for _, uid := range targetUsers {
@@ -255,6 +270,7 @@ func buildResult(messageText string, targetUsers []string, doneSet map[string]bo
 	}
 }
 
+// formatResult 集計結果をSlack投稿用テキストに整形する
 func formatResult(r CheckResult) string {
 	total := len(r.TargetUsers)
 	doneCount := len(r.DoneUsers)
@@ -288,6 +304,7 @@ func formatResult(r CheckResult) string {
 	return b.String()
 }
 
+// formatUserList ユーザーIDリストを「、」区切りのメンション文字列にする
 func formatUserList(userIDs []string) string {
 	mentions := make([]string, len(userIDs))
 	for i, uid := range userIDs {
