@@ -133,16 +133,14 @@ func (h *CommandHandler) resolveTargetUsers(channelID, messageText string, expli
 	}
 
 	// Usergroup mentions in message text
-	for _, gid := range mention.ParseUserGroups(messageText) {
-		members, err := h.client.GetUserGroupMembers(gid)
-		if err != nil {
-			return nil, fmt.Errorf("get members of %s: %w", gid, err)
-		}
-		for _, uid := range members {
-			if !seen[uid] {
-				seen[uid] = true
-				users = append(users, uid)
-			}
+	groupMembers, err := h.expandUserGroups(messageText)
+	if err != nil {
+		return nil, err
+	}
+	for _, uid := range groupMembers {
+		if !seen[uid] {
+			seen[uid] = true
+			users = append(users, uid)
 		}
 	}
 
