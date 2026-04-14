@@ -77,17 +77,22 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 		return
 	}
 
-	// リアクション済みユーザーを収集して結果を組み立てる
+	// リアクション済みユーザーを収集（元メッセージ＋bot返信の両方を集計）
 	doneSet := h.collectDoneUsers(channelID, messageTS)
+	existingBotTS := h.findBotMessage(channelID, messageTS)
+	if existingBotTS != "" {
+		for uid := range h.collectDoneUsers(channelID, existingBotTS) {
+			doneSet[uid] = true
+		}
+	}
+
 	result := buildResult(msg.Text, targetUsers, doneSet)
 	text := formatResult(result)
 
 	// 既存のbot投稿があれば更新、なければ新規投稿（forceNew時は常に新規）
-	if !forceNew {
-		if existingTS := h.findBotMessage(channelID, messageTS); existingTS != "" {
-			h.updateMessage(channelID, existingTS, text)
-			return
-		}
+	if !forceNew && existingBotTS != "" {
+		h.updateMessage(channelID, existingBotTS, text)
+		return
 	}
 	h.respond(channelID, text, messageTS)
 }
@@ -235,6 +240,7 @@ func (h *CommandHandler) collectDoneUsers(channelID, messageTS string) map[strin
 	}
 
 	for _, r := range item.Reactions {
+		log.Printf("reaction found: name=%q count=%d users=%v match=%v", r.Name, r.Count, r.Users, isCompletionReaction(r.Name))
 		if isCompletionReaction(r.Name) {
 			for _, u := range r.Users {
 				done[u] = true

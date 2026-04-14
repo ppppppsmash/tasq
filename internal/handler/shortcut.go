@@ -57,14 +57,15 @@ func (h *ShortcutHandler) Handle(callback slack.InteractionCallback) {
 
 // OpenModal ショートカットから投稿モード選択モーダルを表示する
 func (h *ShortcutHandler) OpenModal(callback slack.InteractionCallback) {
-	// スレッド返信へのショートカットは無視
+	// スレッド返信の場合は親メッセージを対象にする
+	targetTS := callback.Message.Timestamp
 	if callback.Message.ThreadTimestamp != "" && callback.Message.ThreadTimestamp != callback.Message.Timestamp {
-		return
+		targetTS = callback.Message.ThreadTimestamp
 	}
 
 	meta, _ := json.Marshal(ModalMetadata{
 		ChannelID: callback.Channel.ID,
-		MessageTS: callback.Message.Timestamp,
+		MessageTS: targetTS,
 		UserID:    callback.User.ID,
 	})
 
