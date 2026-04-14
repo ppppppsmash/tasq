@@ -51,7 +51,7 @@ func run() error {
 
 	cmdHandler := handler.NewCommandHandler(api)
 	// reactionHandler := handler.NewReactionHandler(api, cmdHandler)
-	shortcutHandler := handler.NewShortcutHandler(cmdHandler)
+	shortcutHandler := handler.NewShortcutHandler(api, cmdHandler)
 	mentionHandler := handler.NewMentionHandler(cmdHandler)
 
 	go handleEvents(client, cmdHandler, shortcutHandler, mentionHandler)

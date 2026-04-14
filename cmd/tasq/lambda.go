@@ -30,11 +30,12 @@ import (
 // asyncTask is a payload for self-invocation to process events asynchronously.
 type asyncTask struct {
 	Async     bool   `json:"async"`
-	Type      string `json:"type"`       // "command", "shortcut", "reaction", "mention"
+	Type      string `json:"type"`       // "command", "shortcut", "reaction", "mention", "modal_submission"
 	ChannelID string `json:"channel_id"`
 	MessageTS string `json:"message_ts"`
 	UserID    string `json:"user_id"`
 	Text      string `json:"text,omitempty"`
+	ForceNew  bool   `json:"force_new,omitempty"`
 }
 
 type lambdaHandler struct {
@@ -59,7 +60,7 @@ func runLambda(api *slack.Client) error {
 
 	cmdHandler := handler.NewCommandHandler(api)
 	// reactionHandler := handler.NewReactionHandler(api, cmdHandler)
-	shortcutHandler := handler.NewShortcutHandler(cmdHandler)
+	shortcutHandler := handler.NewShortcutHandler(api, cmdHandler)
 	mentionHandler := handler.NewMentionHandler(cmdHandler)
 
 	h := &lambdaHandler{
@@ -124,20 +125,36 @@ func (h *lambdaHandler) handleFormRequest(ctx context.Context, body string) (eve
 		return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "bad request"}, nil
 	}
 
-	// Interactive component (shortcut)
+	// Interactive component (shortcut / modal submission)
 	if payload := values.Get("payload"); payload != "" {
 		var callback slack.InteractionCallback
 		if err := json.Unmarshal([]byte(payload), &callback); err != nil {
 			log.Printf("failed to parse interaction payload: %v", err)
 			return events.APIGatewayV2HTTPResponse{StatusCode: 400, Body: "bad payload"}, nil
 		}
-		h.invokeAsync(ctx, asyncTask{
-			Async:     true,
-			Type:      "shortcut",
-			ChannelID: callback.Channel.ID,
-			MessageTS: callback.Message.Timestamp,
-			UserID:    callback.User.ID,
-		})
+
+		switch callback.Type {
+		case slack.InteractionTypeMessageAction:
+			if callback.CallbackID == handler.ShortcutCallbackID {
+				h.shortcutHandler.OpenModal(callback)
+			}
+		case slack.InteractionTypeViewSubmission:
+			if callback.View.CallbackID == handler.ModalCallbackID {
+				meta, forceNew, err := handler.ParseModalSubmission(callback)
+				if err != nil {
+					log.Printf("failed to parse modal submission: %v", err)
+					return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
+				}
+				h.invokeAsync(ctx, asyncTask{
+					Async:     true,
+					Type:      "modal_submission",
+					ChannelID: meta.ChannelID,
+					MessageTS: meta.MessageTS,
+					UserID:    meta.UserID,
+					ForceNew:  forceNew,
+				})
+			}
+		}
 		return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
 	}
 
@@ -226,11 +243,13 @@ func (h *lambdaHandler) invokeAsync(ctx context.Context, task asyncTask) {
 }
 
 func (h *lambdaHandler) processAsync(task asyncTask) {
-	log.Printf("async processing: type=%s channel=%s ts=%s user=%s", task.Type, task.ChannelID, task.MessageTS, task.UserID)
+	log.Printf("async processing: type=%s channel=%s ts=%s user=%s forceNew=%v", task.Type, task.ChannelID, task.MessageTS, task.UserID, task.ForceNew)
 
 	switch task.Type {
+	case "modal_submission":
+		h.cmdHandler.RunCheck(task.ChannelID, task.MessageTS, task.UserID, nil, task.ForceNew)
 	case "shortcut", "reaction", "mention":
-		h.cmdHandler.RunCheck(task.ChannelID, task.MessageTS, task.UserID, nil)
+		h.cmdHandler.RunCheck(task.ChannelID, task.MessageTS, task.UserID, nil, false)
 	case "command":
 		h.cmdHandler.Handle(slack.SlashCommand{
 			ChannelID: task.ChannelID,

@@ -35,6 +35,11 @@ func (h *CommandHandler) Handle(cmd slack.SlashCommand) {
 func (h *CommandHandler) handleCheck(cmd slack.SlashCommand) {
 	args := strings.TrimSpace(strings.TrimPrefix(cmd.Text, "check"))
 
+	// --newフラグをパースして除去
+	forceNew := strings.Contains(args, "--new")
+	args = strings.ReplaceAll(args, "--new", "")
+	args = strings.TrimSpace(args)
+
 	// スレッド元またはリンクから対象メッセージを特定
 	targetTS, err := resolveTargetMessage(cmd, args)
 	if err != nil {
@@ -49,8 +54,8 @@ func (h *CommandHandler) handleCheck(cmd slack.SlashCommand) {
 		return
 	}
 
-	log.Printf("check: channel=%s ts=%s args=%q groups=%d members", cmd.ChannelID, targetTS, args, len(groupMembers))
-	h.RunCheck(cmd.ChannelID, targetTS, cmd.UserID, groupMembers)
+	log.Printf("check: channel=%s ts=%s args=%q groups=%d members forceNew=%v", cmd.ChannelID, targetTS, args, len(groupMembers), forceNew)
+	h.RunCheck(cmd.ChannelID, targetTS, cmd.UserID, groupMembers, forceNew)
 }
 
 // expandUserGroups テキスト中のユーザーグループメンションをメンバー一覧に展開する

@@ -28,7 +28,7 @@ func (h *MentionHandler) Handle(event *slackevents.AppMentionEvent) {
 	messageTS := event.TimeStamp
 
 	log.Printf("mention trigger: channel=%s ts=%s by=%s", channelID, messageTS, userID)
-	h.cmdHandler.RunCheck(channelID, messageTS, userID, nil)
+	h.cmdHandler.RunCheck(channelID, messageTS, userID, nil, false)
 }
 
 // ExtractMentionEvent EventsAPIイベントからAppMentionEventを取り出す

@@ -38,7 +38,7 @@ type CheckResult struct {
 }
 
 // RunCheck 対象メッセージのリアクションを集計して進捗を投稿する
-func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitGroupMembers []string) {
+func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitGroupMembers []string, forceNew bool) {
 	// 対象メッセージを取得
 	msgs, err := h.client.GetConversationHistory(&slack.GetConversationHistoryParameters{
 		ChannelID: channelID,
@@ -82,12 +82,14 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 	result := buildResult(msg.Text, targetUsers, doneSet)
 	text := formatResult(result)
 
-	// 既存のbot投稿があれば更新、なければ新規投稿
-	if existingTS := h.findBotMessage(channelID, messageTS); existingTS != "" {
-		h.updateMessage(channelID, existingTS, text)
-	} else {
-		h.respond(channelID, text, messageTS)
+	// 既存のbot投稿があれば更新、なければ新規投稿（forceNew時は常に新規）
+	if !forceNew {
+		if existingTS := h.findBotMessage(channelID, messageTS); existingTS != "" {
+			h.updateMessage(channelID, existingTS, text)
+			return
+		}
 	}
+	h.respond(channelID, text, messageTS)
 }
 
 // findBotMessage スレッド内の既存bot投稿のタイムスタンプを返す
