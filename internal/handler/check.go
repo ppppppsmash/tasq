@@ -77,11 +77,11 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 		return
 	}
 
-	// リアクション済みユーザーを収集（元メッセージ＋bot返信の両方を集計）
+	// リアクション済みユーザーを収集（元メッセージ＋全bot返信を集計）
 	doneSet := h.collectDoneUsers(channelID, messageTS)
-	existingBotTS := h.findBotMessage(channelID, messageTS)
-	if existingBotTS != "" {
-		for uid := range h.collectDoneUsers(channelID, existingBotTS) {
+	botMessages := h.findAllBotMessages(channelID, messageTS)
+	for _, ts := range botMessages {
+		for uid := range h.collectDoneUsers(channelID, ts) {
 			doneSet[uid] = true
 		}
 	}
@@ -89,21 +89,22 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 	result := buildResult(msg.Text, targetUsers, doneSet)
 	text := formatResult(result)
 
-	// 既存のbot投稿があれば更新、なければ新規投稿（forceNew時は常に新規）
-	if !forceNew && existingBotTS != "" {
-		h.updateMessage(channelID, existingBotTS, text)
+	// 既存のbot投稿があれば全て更新、なければ新規投稿（forceNew時は常に新規）
+	if !forceNew && len(botMessages) > 0 {
+		for _, ts := range botMessages {
+			h.updateMessage(channelID, ts, text)
+		}
 		return
 	}
 	h.respond(channelID, text, messageTS)
 }
 
-// findBotMessage スレッド内の既存bot投稿のタイムスタンプを返す
-func (h *CommandHandler) findBotMessage(channelID, threadTS string) string {
-	// botの自身のユーザーIDを取得
+// findAllBotMessages スレッド内の全bot投稿のタイムスタンプを返す
+func (h *CommandHandler) findAllBotMessages(channelID, threadTS string) []string {
 	authTest, err := h.client.AuthTest()
 	if err != nil {
 		log.Printf("warning: failed to auth test: %v", err)
-		return ""
+		return nil
 	}
 	botUserID := authTest.UserID
 
@@ -113,15 +114,16 @@ func (h *CommandHandler) findBotMessage(channelID, threadTS string) string {
 	})
 	if err != nil {
 		log.Printf("warning: failed to get thread replies: %v", err)
-		return ""
+		return nil
 	}
 
+	var results []string
 	for _, m := range msgs {
 		if m.User == botUserID && m.Timestamp != threadTS {
-			return m.Timestamp
+			results = append(results, m.Timestamp)
 		}
 	}
-	return ""
+	return results
 }
 
 // updateMessage 既存メッセージを更新する

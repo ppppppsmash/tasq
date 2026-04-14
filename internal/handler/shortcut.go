@@ -67,7 +67,7 @@ func (h *ShortcutHandler) OpenModal(callback slack.InteractionCallback) {
 	userID := callback.User.ID
 
 	// 既存のbot投稿がなければモーダルなしで即実行
-	if h.cmdHandler.findBotMessage(channelID, targetTS) == "" {
+	if len(h.cmdHandler.findAllBotMessages(channelID, targetTS)) == 0 {
 		log.Printf("shortcut trigger (no existing reply): channel=%s ts=%s by=%s", channelID, targetTS, userID)
 		h.cmdHandler.RunCheck(channelID, targetTS, userID, nil, false)
 		return
