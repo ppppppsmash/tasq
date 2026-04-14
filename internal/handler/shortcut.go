@@ -55,7 +55,7 @@ func (h *ShortcutHandler) Handle(callback slack.InteractionCallback) {
 	}
 }
 
-// OpenModal ショートカットから投稿モード選択モーダルを表示する
+// OpenModal ショートカットから投稿モード選択モーダルを表示する（既存bot投稿がなければ即実行）
 func (h *ShortcutHandler) OpenModal(callback slack.InteractionCallback) {
 	// スレッド返信の場合は親メッセージを対象にする
 	targetTS := callback.Message.Timestamp
@@ -63,10 +63,20 @@ func (h *ShortcutHandler) OpenModal(callback slack.InteractionCallback) {
 		targetTS = callback.Message.ThreadTimestamp
 	}
 
+	channelID := callback.Channel.ID
+	userID := callback.User.ID
+
+	// 既存のbot投稿がなければモーダルなしで即実行
+	if h.cmdHandler.findBotMessage(channelID, targetTS) == "" {
+		log.Printf("shortcut trigger (no existing reply): channel=%s ts=%s by=%s", channelID, targetTS, userID)
+		h.cmdHandler.RunCheck(channelID, targetTS, userID, nil, false)
+		return
+	}
+
 	meta, _ := json.Marshal(ModalMetadata{
-		ChannelID: callback.Channel.ID,
+		ChannelID: channelID,
 		MessageTS: targetTS,
-		UserID:    callback.User.ID,
+		UserID:    userID,
 	})
 
 	optUpdate := slack.NewOptionBlockObject("update",
