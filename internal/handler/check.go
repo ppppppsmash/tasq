@@ -290,8 +290,7 @@ func formatResult(r CheckResult, executorID string) string {
 	for i, r := range CompletionReactions {
 		reactions[i] = fmt.Sprintf(":%s:", r)
 	}
-	fmt.Fprintf(&b, "Bueller?... Bueller?... Anyone?\n%sリアクションで完了を教えてね！\n", strings.Join(reactions, " "))
-	fmt.Fprintf(&b, "\n\n")
+	fmt.Fprintf(&b, "Bueller?... Bueller?... Anyone?\n対応完了の方は %s のリアクションをつけてね！\n\n", strings.Join(reactions, " "))
 	fmt.Fprintf(&b, "対象: %d名\n", total)
 
 	if len(r.UndoneUsers) > 0 {
