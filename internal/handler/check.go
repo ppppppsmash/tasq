@@ -87,7 +87,7 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 	}
 
 	result := buildResult(msg.Text, targetUsers, doneSet)
-	text := formatResult(result)
+	text := formatResult(result, userID)
 
 	// 既存のbot投稿があれば全て更新、なければ新規投稿（forceNew時は常に新規）
 	if !forceNew && len(botMessages) > 0 {
@@ -281,7 +281,7 @@ func buildResult(messageText string, targetUsers []string, doneSet map[string]bo
 }
 
 // formatResult 集計結果をSlack投稿用テキストに整形する
-func formatResult(r CheckResult) string {
+func formatResult(r CheckResult, executorID string) string {
 	total := len(r.TargetUsers)
 	doneCount := len(r.DoneUsers)
 
@@ -309,6 +309,10 @@ func formatResult(r CheckResult) string {
 	if total > 0 && doneCount == total {
 		quote := completionQuotes[rand.Intn(len(completionQuotes))]
 		fmt.Fprintf(&b, "\n\n🎉%s", quote)
+	}
+
+	if executorID != "" {
+		fmt.Fprintf(&b, "\n\n_集計実行: <@%s>_", executorID)
 	}
 
 	return b.String()
