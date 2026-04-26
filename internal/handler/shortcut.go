@@ -15,6 +15,8 @@ const (
 	ModalCallbackID  = "rollcall_check_modal"
 	PostModeBlockID  = "post_mode_block"
 	PostModeActionID = "post_mode_action"
+	ReminderBlockID  = "reminder_block"
+	ReminderActionID = "reminder_action"
 )
 
 // ModalMetadata モーダルのprivate_metadataに埋め込むコンテキスト情報
@@ -87,12 +89,21 @@ func (h *ShortcutHandler) OpenModal(callback slack.InteractionCallback) {
 	radio := slack.NewRadioButtonsBlockElement(PostModeActionID, optUpdate, optNew)
 	radio.InitialOption = optUpdate
 
-	inputBlock := slack.NewInputBlock(
+	postModeBlock := slack.NewInputBlock(
 		PostModeBlockID,
 		slack.NewTextBlockObject(slack.PlainTextType, "投稿モード", false, false),
 		nil,
 		radio,
 	)
+
+	reminderPicker := slack.NewDateTimePickerBlockElement(ReminderActionID)
+	reminderBlock := slack.NewInputBlock(
+		ReminderBlockID,
+		slack.NewTextBlockObject(slack.PlainTextType, "リマインド時刻（任意）", false, false),
+		slack.NewTextBlockObject(slack.PlainTextType, "⚠ 未対応機能：現在は値を受け取るだけで通知は飛びません", false, false),
+		reminderPicker,
+	)
+	reminderBlock.Optional = true
 
 	modal := slack.ModalViewRequest{
 		Type:            slack.VTModal,
@@ -102,7 +113,7 @@ func (h *ShortcutHandler) OpenModal(callback slack.InteractionCallback) {
 		Close:           slack.NewTextBlockObject(slack.PlainTextType, "キャンセル", false, false),
 		PrivateMetadata: string(meta),
 		Blocks: slack.Blocks{
-			BlockSet: []slack.Block{inputBlock},
+			BlockSet: []slack.Block{postModeBlock, reminderBlock},
 		},
 	}
 
@@ -111,32 +122,39 @@ func (h *ShortcutHandler) OpenModal(callback slack.InteractionCallback) {
 	}
 }
 
-// ParseModalSubmission モーダル送信からメタデータとforceNewフラグを取り出す
-func ParseModalSubmission(callback slack.InteractionCallback) (ModalMetadata, bool, error) {
+// ParseModalSubmission モーダル送信からメタデータ・forceNewフラグ・リマインド時刻を取り出す
+// reminderAt は未指定時 0 を返す（Unix timestamp）
+func ParseModalSubmission(callback slack.InteractionCallback) (ModalMetadata, bool, int64, error) {
 	var meta ModalMetadata
 	if err := json.Unmarshal([]byte(callback.View.PrivateMetadata), &meta); err != nil {
-		return meta, false, err
+		return meta, false, 0, err
 	}
 	forceNew := false
+	var reminderAt int64
 	if callback.View.State != nil {
 		if block, ok := callback.View.State.Values[PostModeBlockID]; ok {
 			if action, ok := block[PostModeActionID]; ok {
 				forceNew = action.SelectedOption.Value == "new"
 			}
 		}
+		if block, ok := callback.View.State.Values[ReminderBlockID]; ok {
+			if action, ok := block[ReminderActionID]; ok {
+				reminderAt = action.SelectedDateTime
+			}
+		}
 	}
-	return meta, forceNew, nil
+	return meta, forceNew, reminderAt, nil
 }
 
 // handleModalSubmission モーダル送信を処理して集計を実行する
 func (h *ShortcutHandler) handleModalSubmission(callback slack.InteractionCallback) {
-	meta, forceNew, err := ParseModalSubmission(callback)
+	meta, forceNew, reminderAt, err := ParseModalSubmission(callback)
 	if err != nil {
 		log.Printf("failed to parse modal metadata: %v", err)
 		return
 	}
 
-	log.Printf("modal submission: channel=%s ts=%s by=%s forceNew=%v",
-		meta.ChannelID, meta.MessageTS, meta.UserID, forceNew)
+	log.Printf("modal submission: channel=%s ts=%s by=%s forceNew=%v reminderAt=%d",
+		meta.ChannelID, meta.MessageTS, meta.UserID, forceNew, reminderAt)
 	h.cmdHandler.RunCheck(meta.ChannelID, meta.MessageTS, meta.UserID, nil, forceNew)
 }

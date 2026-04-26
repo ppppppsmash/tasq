@@ -140,11 +140,12 @@ func (h *lambdaHandler) handleFormRequest(ctx context.Context, body string) (eve
 			}
 		case slack.InteractionTypeViewSubmission:
 			if callback.View.CallbackID == handler.ModalCallbackID {
-				meta, forceNew, err := handler.ParseModalSubmission(callback)
+				meta, forceNew, reminderAt, err := handler.ParseModalSubmission(callback)
 				if err != nil {
 					log.Printf("failed to parse modal submission: %v", err)
 					return events.APIGatewayV2HTTPResponse{StatusCode: 200}, nil
 				}
+				log.Printf("modal submission received: reminderAt=%d (reminder feature not yet active)", reminderAt)
 				h.invokeAsync(ctx, asyncTask{
 					Async:     true,
 					Type:      "modal_submission",
