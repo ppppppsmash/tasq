@@ -12,9 +12,9 @@ import (
 
 // 全員完了時に表示するランダム引用文
 var completionQuotes = []string{
-	"You're all my hero.",
-	"The question isn't what are we gonna do. You already did it.",
-	"Abe Froman would be proud.",
+	"全員対応完了です！ありがとうございました！",
+	"全員揃いました、お疲れさまです！",
+	"コンプリートしました ✨",
 }
 
 // 「完了」として扱うリアクション一覧
@@ -63,7 +63,7 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 		return
 	}
 	if len(targetUsers) == 0 {
-		h.respond(channelID, "Anyone? Anyone? ... No one's here.\nメッセージにメンション（@ユーザー）が含まれていないため、集計対象が見つかりませんでした。", messageTS)
+		h.respond(channelID, "集計対象が見つかりませんでした。\nメッセージにメンション（@ユーザー）が含まれているかご確認ください。", messageTS)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (h *CommandHandler) RunCheck(channelID, messageTS, userID string, explicitG
 		log.Printf("warning: failed to filter bots: %v", err)
 	}
 	if len(targetUsers) == 0 {
-		h.respond(channelID, "Anyone? Anyone? ... No one's here.\nメッセージにメンション（@ユーザー）が含まれていないため、集計対象が見つかりませんでした。", messageTS)
+		h.respond(channelID, "集計対象が見つかりませんでした。\nメッセージにメンション（@ユーザー）が含まれているかご確認ください。", messageTS)
 		return
 	}
 
@@ -290,7 +290,7 @@ func formatResult(r CheckResult, executorID string) string {
 	for i, r := range CompletionReactions {
 		reactions[i] = fmt.Sprintf(":%s:", r)
 	}
-	fmt.Fprintf(&b, "Bueller?... Bueller?... Anyone?\n対応完了の方は %s のリアクションをつけてね！\n\n", strings.Join(reactions, " "))
+	fmt.Fprintf(&b, "対応状況を集計します。\n完了した方は %s のリアクションをお願いします 🙏\n\n", strings.Join(reactions, " "))
 	fmt.Fprintf(&b, "対象: %d名\n", total)
 
 	if len(r.UndoneUsers) > 0 {
@@ -307,7 +307,7 @@ func formatResult(r CheckResult, executorID string) string {
 
 	if total > 0 && doneCount == total {
 		quote := completionQuotes[rand.Intn(len(completionQuotes))]
-		fmt.Fprintf(&b, "\n\n🎉%s", quote)
+		fmt.Fprintf(&b, "\n\n🎉 %s", quote)
 	}
 
 	if executorID != "" {
